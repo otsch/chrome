@@ -72,7 +72,7 @@ abstract class AbstractBinaryInput
      * Save data to the given file.
      *
      * @param string $path
-     * @param int $timeout
+     * @param int    $timeout
      *
      * @throws FilesystemException
      * @throws ScreenshotFailed
