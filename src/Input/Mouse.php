@@ -224,7 +224,7 @@ class Mouse
      * @throws \HeadlessChromium\Exception\CommunicationException\ResponseHasError
      * @throws \HeadlessChromium\Exception\NoResponseAvailable
      *
-     * @return array{ distances: array{ x: int, y: int }, targets: array{ x: int, y: int } }
+     * @return array{ array{ x: int, y: int }, array{ x: int, y: int } }
      */
     private function getScrollDistancesAndTargets(int $distanceY, int $distanceX = 0): array
     {
@@ -242,7 +242,7 @@ class Mouse
 
         return [
             ['x' => $distanceX, 'y' => $distanceY],
-            ['x' => $targetX, 'y' => $targetY],
+            ['x' => (int) $targetX, 'y' => (int) $targetY],
         ];
     }
 
