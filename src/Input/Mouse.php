@@ -203,7 +203,7 @@ class Mouse
                 throw $exception;
             }
 
-            if ($distanceY !== 0 || $distanceX !== 0) { // Try with the new values.
+            if (0 !== $distanceY || 0 !== $distanceX) { // Try with the new values.
                 $this->sendScrollMessage($distances);
 
                 // wait until the scroll is done
