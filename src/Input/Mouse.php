@@ -141,6 +141,7 @@ class Mouse
      *
      * @throws \HeadlessChromium\Exception\CommunicationException
      * @throws \HeadlessChromium\Exception\NoResponseAvailable
+     * @throws \HeadlessChromium\Exception\OperationTimedOut
      *
      * @return $this
      */
@@ -156,6 +157,7 @@ class Mouse
      *
      * @throws \HeadlessChromium\Exception\CommunicationException
      * @throws \HeadlessChromium\Exception\NoResponseAvailable
+     * @throws \HeadlessChromium\Exception\OperationTimedOut
      *
      * @return $this
      */
@@ -180,6 +182,52 @@ class Mouse
     {
         $this->page->assertNotClosed();
 
+        // make sure the mouse is on the screen
+        $this->move($this->x, $this->y);
+
+        [$distances, $targets] = $this->getScrollDistancesAndTargets($distanceY, $distanceX);
+
+        // scroll
+        $this->sendScrollMessage($distances);
+
+        try {
+            // wait until the scroll is done
+            Utils::tryWithTimeout(3_000_000, $this->waitForScroll($targets['x'], $targets['y']));
+        } catch (\HeadlessChromium\Exception\OperationTimedOut $exception) {
+            // Maybe the possible max scroll distances changed in the meantime.
+            $prevDistances = $distances;
+
+            [$distances, $targets] = $this->getScrollDistancesAndTargets($distanceY, $distanceX);
+
+            if ($prevDistances === $distances) {
+                throw $exception;
+            }
+
+            if ($distanceY !== 0 || $distanceX !== 0) { // Try with the new values.
+                $this->sendScrollMessage($distances);
+
+                // wait until the scroll is done
+                Utils::tryWithTimeout(3_000_000, $this->waitForScroll($targets['x'], $targets['y']));
+            }
+        }
+
+        // set new position after move
+        $this->x += $distances['x'];
+        $this->y += $distances['y'];
+
+        return $this;
+    }
+
+    /**
+     * @throws \HeadlessChromium\Exception\OperationTimedOut
+     * @throws \HeadlessChromium\Exception\CommunicationException
+     * @throws \HeadlessChromium\Exception\CommunicationException\ResponseHasError
+     * @throws \HeadlessChromium\Exception\NoResponseAvailable
+     *
+     * @return array{ distances: array{ x: int, y: int }, targets: array{ x: int, y: int } }
+     */
+    private function getScrollDistancesAndTargets(int $distanceY, int $distanceX = 0): array
+    {
         $scrollableArea = $this->page->getLayoutMetrics()->getCssContentSize();
         $visibleArea = $this->page->getLayoutMetrics()->getCssVisualViewport();
 
@@ -192,26 +240,27 @@ class Mouse
         $targetX = $visibleArea['pageX'] + $distanceX;
         $targetY = $visibleArea['pageY'] + $distanceY;
 
-        // make sure the mouse is on the screen
-        $this->move($this->x, $this->y);
+        return [
+            ['x' => $distanceX, 'y' => $distanceY],
+            ['x' => $targetX, 'y' => $targetY],
+        ];
+    }
 
-        // scroll
+    /**
+     * @param array{ x: int, y: int } $distances
+     *
+     * @throws \HeadlessChromium\Exception\CommunicationException
+     * @throws \HeadlessChromium\Exception\NoResponseAvailable
+     */
+    private function sendScrollMessage(array $distances): void
+    {
         $this->page->getSession()->sendMessageSync(new Message('Input.dispatchMouseEvent', [
             'type' => 'mouseWheel',
             'x' => $this->x,
             'y' => $this->y,
-            'deltaX' => $distanceX,
-            'deltaY' => $distanceY,
+            'deltaX' => $distances['x'],
+            'deltaY' => $distances['y'],
         ]));
-
-        // wait until the scroll is done
-        Utils::tryWithTimeout(30000 * 1000, $this->waitForScroll($targetX, $targetY));
-
-        // set new position after move
-        $this->x += $distanceX;
-        $this->y += $distanceY;
-
-        return $this;
     }
 
     /**
